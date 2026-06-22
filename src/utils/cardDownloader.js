@@ -650,6 +650,35 @@ const renderCanvasFlower = (ctx, id, x, y, scale, rotation) => {
   }
 };
 
+// Helper function to capture the animated bouquet SVG
+export const captureBouquetSvg = () => {
+  return new Promise((resolve) => {
+    // Wait for animations to complete (2.5-3 seconds is typical)
+    const maxWait = 3500;
+    const startTime = Date.now();
+    
+    const checkAndCapture = () => {
+      const svgElement = document.querySelector('[class*="bouquet"]') || 
+                         document.querySelector('svg[viewBox]');
+      
+      if (svgElement) {
+        // Found SVG, serialize it
+        const serializer = new XMLSerializer();
+        const svgString = serializer.serializeToString(svgElement);
+        resolve(svgString);
+      } else if (Date.now() - startTime < maxWait) {
+        // Keep checking until SVG is found or timeout
+        setTimeout(checkAndCapture, 100);
+      } else {
+        resolve(null);
+      }
+    };
+    
+    // Start checking
+    setTimeout(checkAndCapture, 500);
+  });
+};
+
 // Main download exporter function
 export const downloadBouquetCard = async (bouquetData) => {
   const width = 1080;

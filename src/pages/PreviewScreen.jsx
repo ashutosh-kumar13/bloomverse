@@ -24,6 +24,9 @@ export default function PreviewScreen({ bouquetData, onBack, onShare }) {
   const handleDownload = async () => {
     setDownloading(true);
     try {
+      // Wait for animations to complete (bouquet animation takes ~2.5 seconds)
+      // Adding extra time to ensure flowers are fully settled
+      await new Promise(resolve => setTimeout(resolve, 3000));
       await downloadBouquetCard(bouquetData);
     } catch (err) {
       console.error(err);
@@ -59,6 +62,9 @@ export default function PreviewScreen({ bouquetData, onBack, onShare }) {
             selectedFlowers={bouquetData.flowers}
             layout={bouquetData.layout}
           />
+          <p className="text-xs text-gray-400 text-center mt-3 italic">
+            💡 Tip: Let the bouquet bloom fully before downloading for best results
+          </p>
         </div>
 
         {/* Message Card Preview */}
@@ -113,7 +119,7 @@ export default function PreviewScreen({ bouquetData, onBack, onShare }) {
                   <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
                   <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
                 </svg>
-                Saving Card...
+                Capturing bouquet...
               </span>
             ) : (
               '⬇️ Download Photo Card'
