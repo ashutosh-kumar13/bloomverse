@@ -650,33 +650,82 @@ const renderCanvasFlower = (ctx, id, x, y, scale, rotation) => {
   }
 };
 
-// Helper function to capture the animated bouquet SVG
-export const captureBouquetSvg = () => {
+// Helper: Convert SVG element to image data URL
+const svgToImage = async (svgElement) => {
   return new Promise((resolve) => {
-    // Wait for animations to complete (2.5-3 seconds is typical)
-    const maxWait = 3500;
-    const startTime = Date.now();
-    
-    const checkAndCapture = () => {
-      const svgElement = document.querySelector('[class*="bouquet"]') || 
-                         document.querySelector('svg[viewBox]');
+    if (!svgElement) {
+      resolve(null);
+      return;
+    }
+
+    try {
+      // Get SVG bounds
+      const bbox = svgElement.getBoundingClientRect();
+      const svgWidth = bbox.width || 390;
+      const svgHeight = bbox.height || 450;
+
+      // Clone and prepare SVG for rendering
+      const clonedSvg = svgElement.cloneNode(true);
+      clonedSvg.setAttribute('width', svgWidth);
+      clonedSvg.setAttribute('height', svgHeight);
       
-      if (svgElement) {
-        // Found SVG, serialize it
-        const serializer = new XMLSerializer();
-        const svgString = serializer.serializeToString(svgElement);
-        resolve(svgString);
-      } else if (Date.now() - startTime < maxWait) {
-        // Keep checking until SVG is found or timeout
-        setTimeout(checkAndCapture, 100);
-      } else {
+      // Serialize to string
+      const serializer = new XMLSerializer();
+      let svgString = serializer.serializeToString(clonedSvg);
+
+      // Add XML declaration
+      svgString = '<?xml version="1.0" encoding="UTF-8"?>' + svgString;
+
+      // Create blob
+      const blob = new Blob([svgString], { type: 'image/svg+xml;charset=utf-8' });
+      const url = URL.createObjectURL(blob);
+
+      // Create image and load
+      const img = new Image();
+      img.onload = () => {
+        resolve({
+          image: img,
+          width: svgWidth,
+          height: svgHeight,
+        });
+      };
+      img.onerror = () => {
+        URL.revokeObjectURL(url);
         resolve(null);
-      }
-    };
-    
-    // Start checking
-    setTimeout(checkAndCapture, 500);
+      };
+      img.src = url;
+    } catch (error) {
+      console.error('Error converting SVG to image:', error);
+      resolve(null);
+    }
   });
+};
+
+// Helper: Find the SVG bouquet element
+const findBouquetSvg = () => {
+  // Try multiple selectors
+  const selectors = [
+    'svg[viewBox]',
+    '[class*="bouquet"] svg',
+    'svg[class*="canvas"]',
+  ];
+
+  for (const selector of selectors) {
+    const element = document.querySelector(selector);
+    if (element && element.innerHTML && element.innerHTML.length > 100) {
+      return element;
+    }
+  }
+
+  // Last resort: find any large SVG
+  const allSvgs = document.querySelectorAll('svg[viewBox]');
+  for (const svg of allSvgs) {
+    if (svg.innerHTML.length > 500) {
+      return svg;
+    }
+  }
+
+  return null;
 };
 
 // Main download exporter function
@@ -684,7 +733,11 @@ export const downloadBouquetCard = async (bouquetData) => {
   const width = 1080;
   const height = 1350;
   
-  // 1. Create off-screen canvas
+  // 1. Capture the actual rendered SVG bouquet
+  const bouquetSvgElement = findBouquetSvg();
+  const bouquetImage = await svgToImage(bouquetSvgElement);
+  
+  // 2. Create off-screen canvas
   const canvas = document.createElement('canvas');
   canvas.width = width;
   canvas.height = height;
@@ -694,7 +747,7 @@ export const downloadBouquetCard = async (bouquetData) => {
   ctx.imageSmoothingEnabled = true;
   ctx.imageSmoothingQuality = 'high';
   
-  // 2. Draw Background
+  // 3. Draw Background
   // Soft cream white background
   ctx.fillStyle = '#FFF9F5';
   ctx.fillRect(0, 0, width, height);
@@ -706,158 +759,21 @@ export const downloadBouquetCard = async (bouquetData) => {
   ctx.fillStyle = bgGlow;
   ctx.fillRect(0, 0, width, height);
   
-  // 3. Generate positions matching composition engine (BouquetCanvas.jsx)
-  const layoutType = bouquetData.layout || 'classic';
-  const elements = [];
-  const scaleFactor = 2.5;
-  const centerX = width / 2;
-  const centerY = 450;
+  // 4. Draw the captured SVG bouquet (instead of manually redrawing)
+  if (bouquetImage && bouquetImage.image) {
+    // Scale and center the bouquet image
+    const scaleFactor = 2.5;
+    const bouquetWidth = bouquetImage.width * scaleFactor;
+    const bouquetHeight = bouquetImage.height * scaleFactor;
+    const bouquetX = (width - bouquetWidth) / 2;
+    const bouquetY = 200;
+    
+    ctx.drawImage(bouquetImage.image, bouquetX, bouquetY, bouquetWidth, bouquetHeight);
+  }
   
-  // A. Outer Fern Leaves
-  const greeneryCount = 7;
-  for (let i = 0; i < greeneryCount; i++) {
-    const angle = -Math.PI + (i / (greeneryCount - 1)) * Math.PI;
-    const radius = layoutType === 'cascade' ? 125 : 110;
-    elements.push({
-      type: 'greenery',
-      x: centerX + Math.cos(angle) * radius * scaleFactor,
-      y: centerY + (Math.sin(angle) * (radius - 15) - (layoutType === 'cascade' ? -15 : 20)) * scaleFactor,
-      scale: (0.95 + (i % 2) * 0.1) * scaleFactor,
-      rotation: (angle * 180 / Math.PI) + 90 + (i % 2 === 0 ? 5 : -5),
-      zIndex: 5,
-    });
-  }
-
-  // B. Grass blades sweeping left & right
-  elements.push(
-    { type: 'grass', x: centerX - 20 * scaleFactor, y: centerY + 70 * scaleFactor, rotation: 10, scale: 0.9, side: -1, zIndex: 6 },
-    { type: 'grass', x: centerX + 20 * scaleFactor, y: centerY + 70 * scaleFactor, rotation: -10, scale: 0.9, side: 1, zIndex: 6 },
-    { type: 'grass', x: centerX - 10 * scaleFactor, y: centerY + 80 * scaleFactor, rotation: 25, scale: 1.0, side: -1, zIndex: 7 },
-    { type: 'grass', x: centerX + 10 * scaleFactor, y: centerY + 80 * scaleFactor, rotation: -25, scale: 1.0, side: 1, zIndex: 7 }
-  );
-
-  // C. Lavender background stems
-  const lavenderCount = bouquetData.flowers.includes('lavender') ? 5 : 3;
-  for (let i = 0; i < lavenderCount; i++) {
-    const angle = (i / lavenderCount) * Math.PI * 2 + Math.PI / 4;
-    const radius = 115;
-    elements.push({
-      type: 'flower',
-      flowerId: 'lavender',
-      x: centerX + Math.cos(angle) * radius * scaleFactor,
-      y: centerY + (Math.sin(angle) * (radius - 20) - 25) * scaleFactor,
-      scale: (0.85 + (i % 2) * 0.1) * scaleFactor,
-      rotation: (angle * 180 / Math.PI) + (i % 2 === 0 ? 15 : -15),
-      zIndex: 8,
-    });
-  }
-
-  // D. Selection processing
-  const pool = bouquetData.flowers.filter(f => f !== 'lavender');
-  const flowersToUse = pool.length > 0 ? pool : ['rose'];
-  const primary = flowersToUse[0];
-  const supportingCount = layoutType === 'cascade' ? 7 : (layoutType === 'heart' ? 8 : 6);
-
-  // Center Flower
-  elements.push({
-    type: 'flower',
-    flowerId: primary,
-    x: centerX,
-    y: centerY + (layoutType === 'cascade' ? -25 : -15) * scaleFactor,
-    scale: 1.3 * scaleFactor,
-    rotation: -5 + Math.random() * 10,
-    zIndex: 35,
-  });
-
-  // Supporting Flowers
-  if (layoutType === 'classic') {
-    for (let i = 0; i < supportingCount; i++) {
-      const angle = (i / supportingCount) * Math.PI * 2 + 0.3;
-      const radius = 70;
-      elements.push({
-        type: 'flower',
-        flowerId: flowersToUse[i % flowersToUse.length],
-        x: centerX + Math.cos(angle) * radius * scaleFactor,
-        y: centerY + (Math.sin(angle) * (radius - 10) - 15) * scaleFactor,
-        scale: (0.95 + (i % 3) * 0.08) * scaleFactor,
-        rotation: -20 + Math.random() * 40,
-        zIndex: 25,
-      });
-    }
-  } else if (layoutType === 'cascade') {
-    const cascadeOffsets = [
-      { x: -45, y: -55, scale: 0.95 },
-      { x: 45, y: -55, scale: 0.95 },
-      { x: -55, y: 15, scale: 0.9 },
-      { x: 55, y: 15, scale: 0.9 },
-      { x: 0, y: 35, scale: 1.0 },
-      { x: -25, y: 85, scale: 0.85 },
-      { x: 15, y: 125, scale: 0.8 },
-    ];
-    for (let i = 0; i < Math.min(supportingCount, cascadeOffsets.length); i++) {
-      const offset = cascadeOffsets[i];
-      elements.push({
-        type: 'flower',
-        flowerId: flowersToUse[i % flowersToUse.length],
-        x: centerX + offset.x * scaleFactor,
-        y: centerY + offset.y * scaleFactor,
-        scale: offset.scale * scaleFactor,
-        rotation: -15 + Math.random() * 30,
-        zIndex: 30 - Math.floor(offset.y / 10),
-      });
-    }
-  } else if (layoutType === 'modern') {
-    const modernOffsets = [
-      { x: -35, y: -30, scale: 0.95 },
-      { x: 35, y: -25, scale: 1.0 },
-      { x: -20, y: 25, scale: 1.0 },
-      { x: 25, y: 20, scale: 0.9 },
-      { x: -45, y: 15, scale: 0.85 },
-      { x: 8, y: -45, scale: 0.95 },
-    ];
-    for (let i = 0; i < Math.min(supportingCount, modernOffsets.length); i++) {
-      const offset = modernOffsets[i];
-      elements.push({
-        type: 'flower',
-        flowerId: flowersToUse[i % flowersToUse.length],
-        x: centerX + offset.x * scaleFactor,
-        y: centerY + offset.y * scaleFactor,
-        scale: offset.scale * scaleFactor,
-        rotation: -20 + Math.random() * 40,
-        zIndex: 25,
-      });
-    }
-  } else if (layoutType === 'heart') {
-    const heartOffsets = [
-      { x: -50, y: -45 },
-      { x: 50, y: -45 },
-      { x: -70, y: -15 },
-      { x: 70, y: -15 },
-      { x: -45, y: 25 },
-      { x: 45, y: 25 },
-      { x: -20, y: 55 },
-      { x: 20, y: 55 },
-    ];
-    for (let i = 0; i < Math.min(supportingCount, heartOffsets.length); i++) {
-      const offset = heartOffsets[i];
-      elements.push({
-        type: 'flower',
-        flowerId: flowersToUse[i % flowersToUse.length],
-        x: centerX + offset.x * scaleFactor,
-        y: centerY + offset.y * scaleFactor,
-        scale: 0.9 * scaleFactor,
-        rotation: -10 + Math.random() * 20,
-        zIndex: 25,
-      });
-    }
-  }
-
-  // Sort elements by zIndex
-  elements.sort((a, b) => a.zIndex - b.zIndex);
-
-  // 4. Draw WRAPPING PAPER BACK
-  ctx.save();
-  ctx.translate(centerX, centerY + 100 * scaleFactor);
+  // 5. Draw wrapper paper (stays on top of bouquet)
+  
+  // 5. Draw WRAPPING PAPER BACK (on top of bouquet)
   
   const pinkPaperGrad = ctx.createLinearGradient(-150 * scaleFactor, -150 * scaleFactor, 150 * scaleFactor, 150 * scaleFactor);
   pinkPaperGrad.addColorStop(0, '#FFF2F4');
@@ -899,21 +815,7 @@ export const downloadBouquetCard = async (bouquetData) => {
   
   ctx.restore();
 
-  // 5. Draw FLOWERS & GREENERY (Fern Leaves + Grass Blades + Outlined Flowers)
-  elements.forEach((el) => {
-    if (el.type === 'greenery') {
-      drawFernLeaf(ctx, el.x, el.y, el.rotation, el.scale / scaleFactor);
-    } else if (el.type === 'grass') {
-      drawGrassBlade(ctx, el.x, el.y, el.rotation, el.scale, el.side);
-    } else {
-      renderCanvasFlower(ctx, el.flowerId, el.x, el.y, el.scale / scaleFactor, el.rotation);
-    }
-  });
-
-  // 6. Draw STEMS BUNDLE
-  drawStemsBundle(ctx, centerX, centerY, scaleFactor);
-
-  // 7. Draw WRAPPING PAPER FRONT
+  // 6. Draw WRAPPING PAPER FRONT
   ctx.save();
   ctx.translate(centerX, centerY + 100 * scaleFactor);
   
@@ -947,7 +849,7 @@ export const downloadBouquetCard = async (bouquetData) => {
   
   ctx.restore();
 
-  // 8. Draw SILK RIBBON BOW
+  // 7. Draw SILK RIBBON BOW
   ctx.save();
   ctx.translate(centerX, centerY + 95 * scaleFactor);
   
@@ -1004,7 +906,7 @@ export const downloadBouquetCard = async (bouquetData) => {
   
   ctx.restore();
 
-  // 9. Draw GREETING CARD PANEL (Glassmorphism card)
+  // 8. Draw GREETING CARD PANEL (Glassmorphism card)
   const cardWidth = 900;
   const cardHeight = 350;
   const cardX = (width - cardWidth) / 2;
@@ -1050,7 +952,7 @@ export const downloadBouquetCard = async (bouquetData) => {
   ctx.font = 'italic 26px "Playfair Display", Georgia, serif';
   ctx.fillText(`With love from  ${bouquetData.senderName}`, width / 2, cardY + 295);
   
-  // 10. Draw BRANDING (Footer)
+  // 9. Draw BRANDING (Footer)
   ctx.fillStyle = '#E85D75';
   ctx.font = 'bold 28px "Playfair Display", Georgia, serif';
   ctx.letterSpacing = '3px';
@@ -1061,7 +963,7 @@ export const downloadBouquetCard = async (bouquetData) => {
   ctx.letterSpacing = '0.5px';
   ctx.fillText('Create your own digital bouquet at bloomverse.com', width / 2, height - 30);
   
-  // 11. Trigger Download
+  // 10. Trigger Download
   const dataUrl = canvas.toDataURL('image/png');
   const link = document.createElement('a');
   link.download = `Bloomverse_Gift_to_${bouquetData.recipientName.replace(/\s+/g, '_')}.png`;
