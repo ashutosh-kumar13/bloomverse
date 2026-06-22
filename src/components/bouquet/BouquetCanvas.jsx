@@ -1,6 +1,16 @@
 import { motion } from 'framer-motion';
 import { useState, useEffect, useMemo } from 'react';
 import { flowers } from '../../data/flowers';
+import {
+  Rose,
+  Tulip,
+  Sunflower,
+  Peony,
+  Lily,
+  Daisy,
+  Orchid,
+  Lavender,
+} from '../flowers/ImprovedFlowers';
 
 // 1. SVG Fern/Ash Leaf Greenery Component (from user reference image)
 const FernLeaf = ({ x, y, rotation, scale }) => (
@@ -353,23 +363,23 @@ const RibbonBow = () => (
 const renderSvgFlower = (flowerId, x, y, scale, rotation) => {
   switch (flowerId) {
     case 'rose':
-      return <RoseFlower x={x} y={y} scale={scale} rotation={rotation} />;
+      return <Rose x={x} y={y} scale={scale} rotation={rotation} />;
     case 'tulip':
-      return <TulipFlower x={x} y={y} scale={scale} rotation={rotation} />;
+      return <Tulip x={x} y={y} scale={scale} rotation={rotation} />;
     case 'sunflower':
-      return <SunflowerFlower x={x} y={y} scale={scale} rotation={rotation} />;
+      return <Sunflower x={x} y={y} scale={scale} rotation={rotation} />;
     case 'peony':
-      return <PeonyFlower x={x} y={y} scale={scale} rotation={rotation} />;
+      return <Peony x={x} y={y} scale={scale} rotation={rotation} />;
     case 'lily':
-      return <LilyFlower x={x} y={y} scale={scale} rotation={rotation} />;
+      return <Lily x={x} y={y} scale={scale} rotation={rotation} />;
     case 'daisy':
-      return <DaisyFlower x={x} y={y} scale={scale} rotation={rotation} />;
+      return <Daisy x={x} y={y} scale={scale} rotation={rotation} />;
     case 'orchid':
-      return <OrchidFlower x={x} y={y} scale={scale} rotation={rotation} />;
+      return <Orchid x={x} y={y} scale={scale} rotation={rotation} />;
     case 'lavender':
-      return <LavenderFlower x={x} y={y} scale={scale} rotation={rotation} />;
+      return <Lavender x={x} y={y} scale={scale} rotation={rotation} />;
     default:
-      return <RoseFlower x={x} y={y} scale={scale} rotation={rotation} />;
+      return <Rose x={x} y={y} scale={scale} rotation={rotation} />;
   }
 };
 

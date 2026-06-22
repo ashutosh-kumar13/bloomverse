@@ -759,10 +759,14 @@ export const downloadBouquetCard = async (bouquetData) => {
   ctx.fillStyle = bgGlow;
   ctx.fillRect(0, 0, width, height);
   
+  // Define scale and center positioning
+  const scaleFactor = 2.5;
+  const centerX = width / 2;
+  const centerY = 400;
+
   // 4. Draw the captured SVG bouquet (instead of manually redrawing)
   if (bouquetImage && bouquetImage.image) {
     // Scale and center the bouquet image
-    const scaleFactor = 2.5;
     const bouquetWidth = bouquetImage.width * scaleFactor;
     const bouquetHeight = bouquetImage.height * scaleFactor;
     const bouquetX = (width - bouquetWidth) / 2;
@@ -774,6 +778,8 @@ export const downloadBouquetCard = async (bouquetData) => {
   // 5. Draw wrapper paper (stays on top of bouquet)
   
   // 5. Draw WRAPPING PAPER BACK (on top of bouquet)
+  ctx.save();
+  ctx.translate(centerX, centerY - 95 * scaleFactor);
   
   const pinkPaperGrad = ctx.createLinearGradient(-150 * scaleFactor, -150 * scaleFactor, 150 * scaleFactor, 150 * scaleFactor);
   pinkPaperGrad.addColorStop(0, '#FFF2F4');
